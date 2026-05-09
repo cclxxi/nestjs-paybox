@@ -41,7 +41,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
     "@nestjs/common": ">=9.0.0",
