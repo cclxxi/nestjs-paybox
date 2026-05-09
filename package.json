@@ -1,6 +1,6 @@
 {
   "name": "nestjs-paybox",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "NestJS module for Paybox payment protocol (GreenleavesPay and compatible providers)",
   "author": "Ilia Proshin",
   "private": false,
@@ -48,7 +48,6 @@
     "@nestjs/core": ">=9.0.0",
     "reflect-metadata": ">=0.1.0"
   },
-  "dependencies": {},
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
