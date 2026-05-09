@@ -27,7 +27,20 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Check if version already published
+        id: version_check
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @arannati/common version 2>/dev/null || echo "none")
+          if [ "$PKG_VERSION" = "$PUBLISHED" ]; then
+            echo "Version $PKG_VERSION already published, skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish package to npm
+        if: steps.version_check.outputs.skip != 'true'
         run: pnpm publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
