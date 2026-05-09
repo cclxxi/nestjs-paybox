@@ -2,14 +2,14 @@
 
 NestJS module for integrating with payment providers that use the **Paybox protocol** (GreenleavesPay, Paybox.money, and compatible providers).
 
-Inspired by [nestjs-yookassa](https://github.com/teacoder-team/nestjs-yookassa) — a similar library for Yookassa (Russia). This one is for Kazakhstan and CIS providers.
-
 ## Installation
 
 ```bash
 npm install nestjs-paybox
 # or
 yarn add nestjs-paybox
+# or
+pnpm add nestjs-paybox
 ```
 
 Requires Node.js 18+ (uses native `fetch`).
