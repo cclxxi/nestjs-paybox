@@ -281,4 +281,12 @@ await paybox.initPayment({ amount: 150000, currency: 'KZT', ... })
 
 ## License
 
-MIT
+GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later).
+See [`LICENSE`](./LICENSE) and [`COPYING`](./COPYING) for the full text.
+
+Versions `0.1.3` and earlier were released under the MIT license. The
+`0.1.6` release was briefly published under GPL-3.0. From `0.1.7` onward
+the package is licensed under LGPL-3.0-or-later — application code that
+merely imports this library is **not** required to be open-sourced;
+modifications to the library itself must remain under a compatible
+license.
