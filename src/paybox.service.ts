@@ -12,7 +12,7 @@ import {
 } from './interfaces'
 import type { PayboxModuleOptions } from './interfaces/paybox-options.interface'
 import { PAYBOX_OPTIONS } from './paybox.constants'
-import { buildSignature, parseXmlValue } from './utils'
+import { buildSignature, parseXmlValue, timingSafeCompare } from './utils'
 
 @Injectable()
 export class PayboxService {
@@ -56,7 +56,6 @@ export class PayboxService {
     )
 
     const xml = await this.httpService.callSigned('init_payment.php', params)
-    this.logger.debug(`Paybox init_payment response: ${xml}`)
 
     const status = parseXmlValue(xml, 'pg_status')
     const redirectUrl = parseXmlValue(xml, 'pg_redirect_url')
@@ -169,6 +168,22 @@ export class PayboxService {
   }
 
   verifyWebhook(params: Record<string, string>): boolean {
+    return this.verifySignature(this.resultScriptName, params)
+  }
+
+  verifyCheckWebhook(params: Record<string, string>): boolean {
+    return this.verifySignature('check_url', params)
+  }
+
+  /**
+   * Rebuilds the expected signature for a webhook payload and compares it to
+   * the received `pg_sig` in constant time. Single source of truth for webhook
+   * signature verification (also used by PayboxWebhookGuard).
+   */
+  private verifySignature(
+    scriptName: string,
+    params: Record<string, string>,
+  ): boolean {
     const receivedSig = params['pg_sig']
     if (!receivedSig) {
       this.logger.warn('Webhook missing pg_sig')
@@ -179,31 +194,17 @@ export class PayboxService {
     delete paramsWithoutSig['pg_sig']
 
     const expectedSig = buildSignature(
-      this.resultScriptName,
+      scriptName,
       paramsWithoutSig,
       this.options.secretKey,
     )
-    const isValid = expectedSig === receivedSig
+    const isValid = timingSafeCompare(expectedSig, receivedSig)
 
     if (!isValid) {
-      this.logger.warn(
-        `Invalid webhook signature. Expected ${expectedSig}, got ${receivedSig} (script_name=${this.resultScriptName})`,
-      )
+      // Do not log the expected signature: it is secret-derived.
+      this.logger.warn(`Invalid webhook signature (script_name=${scriptName})`)
     }
     return isValid
-  }
-
-  verifyCheckWebhook(params: Record<string, string>): boolean {
-    const receivedSig = params['pg_sig']
-    if (!receivedSig) return false
-
-    const paramsWithoutSig = { ...params }
-    delete paramsWithoutSig['pg_sig']
-
-    return (
-      buildSignature('check_url', paramsWithoutSig, this.options.secretKey) ===
-      receivedSig
-    )
   }
 
   buildResponseSignature(

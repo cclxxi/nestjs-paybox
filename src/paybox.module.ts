@@ -4,6 +4,7 @@ import { PayboxHttpService } from './http/paybox-http.service'
 import { PayboxModuleAsyncOptions, PayboxModuleOptions } from './interfaces'
 import { PAYBOX_OPTIONS } from './paybox.constants'
 import { PayboxService } from './paybox.service'
+import { validatePayboxOptions } from './utils'
 
 @Module({})
 export class PayboxModule {
@@ -12,7 +13,7 @@ export class PayboxModule {
       module: PayboxModule,
       global: options.isGlobal ?? true,
       providers: [
-        { provide: PAYBOX_OPTIONS, useValue: options },
+        { provide: PAYBOX_OPTIONS, useValue: validatePayboxOptions(options) },
         PayboxHttpService,
         PayboxService,
       ],
@@ -28,7 +29,9 @@ export class PayboxModule {
       providers: [
         {
           provide: PAYBOX_OPTIONS,
-          useFactory: options.useFactory,
+
+          useFactory: async (...args: any[]) =>
+            validatePayboxOptions(await options.useFactory(...args)),
           inject: options.inject ?? [],
         },
         PayboxHttpService,

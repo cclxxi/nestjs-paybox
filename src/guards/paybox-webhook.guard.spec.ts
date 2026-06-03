@@ -4,7 +4,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 
+import type { PayboxHttpService } from '../http/paybox-http.service'
 import type { PayboxModuleOptions } from '../interfaces'
+import { PayboxService } from '../paybox.service'
 import { buildSignature } from '../utils'
 import { PayboxWebhookGuard } from './paybox-webhook.guard'
 
@@ -14,6 +16,13 @@ const baseOptions: PayboxModuleOptions = {
   resultUrl: 'https://app.example/result',
   successUrl: 'https://app.example/success',
   failureUrl: 'https://app.example/failure',
+}
+
+// verifyWebhook only touches options; the HTTP service is never called here.
+const stubHttp = {} as PayboxHttpService
+
+function makeGuard(options: PayboxModuleOptions): PayboxWebhookGuard {
+  return new PayboxWebhookGuard(options, new PayboxService(options, stubHttp))
 }
 
 function makeContext(
@@ -49,7 +58,7 @@ function signedBody(
 
 describe('PayboxWebhookGuard', () => {
   it('allows valid signature with no IP whitelist configured', () => {
-    const guard = new PayboxWebhookGuard(baseOptions)
+    const guard = makeGuard(baseOptions)
     const body = signedBody({
       pg_order_id: '1',
       pg_payment_id: '2',
@@ -59,7 +68,7 @@ describe('PayboxWebhookGuard', () => {
   })
 
   it('rejects body with invalid signature', () => {
-    const guard = new PayboxWebhookGuard(baseOptions)
+    const guard = makeGuard(baseOptions)
     const body = {
       pg_order_id: '1',
       pg_payment_id: '2',
@@ -72,21 +81,21 @@ describe('PayboxWebhookGuard', () => {
   })
 
   it('rejects body without pg_sig', () => {
-    const guard = new PayboxWebhookGuard(baseOptions)
+    const guard = makeGuard(baseOptions)
     expect(() =>
       guard.canActivate(makeContext({ body: { pg_order_id: '1' } })),
     ).toThrow(UnauthorizedException)
   })
 
   it('rejects request when body is missing', () => {
-    const guard = new PayboxWebhookGuard(baseOptions)
+    const guard = makeGuard(baseOptions)
     expect(() => guard.canActivate(makeContext({}))).toThrow(
       UnauthorizedException,
     )
   })
 
   it('rejects request from non-whitelisted IP before checking signature', () => {
-    const guard = new PayboxWebhookGuard({
+    const guard = makeGuard({
       ...baseOptions,
       allowedIps: ['1.1.1.1'],
     })
@@ -97,7 +106,7 @@ describe('PayboxWebhookGuard', () => {
   })
 
   it('honors x-forwarded-for header for IP check', () => {
-    const guard = new PayboxWebhookGuard({
+    const guard = makeGuard({
       ...baseOptions,
       allowedIps: ['1.1.1.1'],
     })
@@ -117,7 +126,7 @@ describe('PayboxWebhookGuard', () => {
       ...baseOptions,
       resultScriptName: 'custom',
     }
-    const guard = new PayboxWebhookGuard(opts)
+    const guard = makeGuard(opts)
     const body = signedBody({ pg_order_id: '1' }, opts.secretKey, 'custom')
     expect(guard.canActivate(makeContext({ body }))).toBe(true)
   })

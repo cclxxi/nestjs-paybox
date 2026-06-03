@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 
 import type { PayboxModuleOptions } from '../interfaces'
 import { PAYBOX_API_URL, PAYBOX_OPTIONS } from '../paybox.constants'
-import { buildSignature } from '../utils'
+import { buildSignature, redactXml } from '../utils'
 
 const DEFAULT_TIMEOUT_MS = 30_000
 
@@ -53,7 +53,7 @@ export class PayboxHttpService {
       }
 
       const xml = await response.text()
-      this.logger.debug(`Paybox ${scriptName} response: ${xml}`)
+      this.logger.debug(`Paybox ${scriptName} response: ${redactXml(xml)}`)
       return xml
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {

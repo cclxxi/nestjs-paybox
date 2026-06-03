@@ -1,4 +1,4 @@
-import { parseXmlValue } from './xml.util'
+import { parseXmlValue, redactXml } from './xml.util'
 
 describe('parseXmlValue', () => {
   it('extracts simple tag content', () => {
@@ -36,5 +36,28 @@ describe('parseXmlValue', () => {
       </response>`
     expect(parseXmlValue(xml, 'pg_status')).toBe('ok')
     expect(parseXmlValue(xml, 'pg_payment_id')).toBe('p-42')
+  })
+})
+
+describe('redactXml', () => {
+  it('masks card pan and customer PII while leaving other tags intact', () => {
+    const xml =
+      '<pg_status>ok</pg_status><pg_card_pan>4400********1234</pg_card_pan>' +
+      '<pg_user_phone>77001234567</pg_user_phone>' +
+      '<pg_user_contact_email>a@b.com</pg_user_contact_email>'
+    const out = redactXml(xml)
+
+    expect(out).toContain('<pg_status>ok</pg_status>')
+    expect(out).toContain('<pg_card_pan>***</pg_card_pan>')
+    expect(out).toContain('<pg_user_phone>***</pg_user_phone>')
+    expect(out).toContain('<pg_user_contact_email>***</pg_user_contact_email>')
+    expect(out).not.toContain('4400')
+    expect(out).not.toContain('77001234567')
+    expect(out).not.toContain('a@b.com')
+  })
+
+  it('returns input unchanged when no sensitive tags are present', () => {
+    const xml = '<pg_status>ok</pg_status><pg_payment_id>p1</pg_payment_id>'
+    expect(redactXml(xml)).toBe(xml)
   })
 })

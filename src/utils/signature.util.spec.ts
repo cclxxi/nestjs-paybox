@@ -1,6 +1,25 @@
 import crypto from 'node:crypto'
 
-import { buildSignature } from './signature.util'
+import { buildSignature, timingSafeCompare } from './signature.util'
+
+describe('timingSafeCompare', () => {
+  it('returns true for identical strings', () => {
+    expect(timingSafeCompare('abc123', 'abc123')).toBe(true)
+  })
+
+  it('returns false for different strings of equal length', () => {
+    expect(timingSafeCompare('abc123', 'abc124')).toBe(false)
+  })
+
+  it('returns false for strings of different length without throwing', () => {
+    expect(timingSafeCompare('abc', 'abcd')).toBe(false)
+    expect(timingSafeCompare('', 'x')).toBe(false)
+  })
+
+  it('returns true for two empty strings', () => {
+    expect(timingSafeCompare('', '')).toBe(true)
+  })
+})
 
 describe('buildSignature', () => {
   const md5 = (s: string) => crypto.createHash('md5').update(s).digest('hex')
