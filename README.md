@@ -1,6 +1,32 @@
 # nestjs-paybox
 
-NestJS module for integrating with payment providers that use the **Paybox protocol** (GreenleavesPay, Paybox.money, and compatible providers).
+**English** · [Русский](./README.ru.md)
+
+[![npm version](https://img.shields.io/npm/v/nestjs-paybox.svg)](https://www.npmjs.com/package/nestjs-paybox)
+[![npm downloads](https://img.shields.io/npm/dm/nestjs-paybox.svg)](https://www.npmjs.com/package/nestjs-paybox)
+[![License: LGPL v3](https://img.shields.io/badge/License-LGPLv3-blue.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+[![NestJS](https://img.shields.io/badge/NestJS-9%20|%2010%20|%2011-e0234e.svg)](https://nestjs.com)
+
+A small, batteries-included NestJS module for the **Paybox payment protocol** —
+GreenleavesPay, Paybox.money, and other compatible providers. Drop it in, register
+once, and you get a typed `PayboxService` plus a `@PayboxWebhook()` guard that
+verifies callbacks for you.
+
+No heavyweight SDK, no extra HTTP client — just native `fetch`, MD5 request
+signing, and a thin typed surface over the provider's XML API.
+
+## Why nestjs-paybox
+
+- **Typed end to end** — payments, refunds, captures, status, and webhook payloads
+  all come back as proper TypeScript types, not loose `Record`s.
+- **Secure by default** — webhook signatures are checked in **constant time**,
+  card/PII fields are redacted from logs, and config is validated at boot so a
+  missing secret fails fast instead of silently breaking signatures.
+- **One-line webhook auth** — `@PayboxWebhook()` handles the IP allowlist and
+  `pg_sig` verification; your handler only sees verified requests.
+- **Zero ceremony** — `forRoot` / `forRootAsync`, sensible defaults, ~1 dependency
+  surface (just `@nestjs/common` + `reflect-metadata` as peers).
 
 ## Installation
 
@@ -62,6 +88,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
 export class AppModule {}
 ```
 
+> Required options (`merchantId`, `secretKey`, and the three URLs) are validated at
+> module init — a missing or blank value throws on boot, not at the first request.
+
 ### 2. Use `PayboxService`
 
 ```typescript
@@ -99,7 +128,7 @@ export class WebhookController {
 
   @Post('paybox/result')
   @HttpCode(200)
-  @PayboxWebhook()  // verifies IP whitelist + pg_sig signature
+  @PayboxWebhook()  // verifies IP allowlist + pg_sig signature
   async handleResult(@Body() body: Record<string, string>, @Res() res: Response) {
     const orderId = body['pg_order_id']
     const isSuccess = body['pg_result'] === '1'
@@ -127,7 +156,7 @@ export class WebhookController {
 | `apiUrl` | `string` | | Provider API base URL. Default: `https://api.greenleavespay.kz` |
 | `testingMode` | `boolean` | | Enable testing mode flag in requests |
 | `resultScriptName` | `string` | | Script name for webhook signature verification. Default: `'result'` |
-| `allowedIps` | `string[]` | | IP whitelist for `@PayboxWebhook()` guard. Empty = skip IP check (signature is still verified) |
+| `allowedIps` | `string[]` | | IP allowlist for `@PayboxWebhook()` guard. Empty = skip IP check (signature is still verified) |
 | `timeoutMs` | `number` | | HTTP request timeout in ms. Default: `30000` |
 | `isGlobal` | `boolean` | | Register module as global. Default: `true` |
 
@@ -196,7 +225,7 @@ const result = await paybox.capturePayment('grl-payment-id', 150000)
 
 ### `verifyWebhook(params)` / `verifyCheckWebhook(params)`
 
-Manually verify a webhook signature. Called automatically by `@PayboxWebhook()` guard.
+Manually verify a webhook signature (constant-time comparison). Called automatically by the `@PayboxWebhook()` guard.
 
 ```typescript
 const isValid = paybox.verifyWebhook(req.body)
@@ -216,7 +245,7 @@ const xml = paybox.buildResponseSignature('result', {
 
 ## `@PayboxWebhook()` decorator
 
-Applies an IP whitelist check and `pg_sig` signature verification guard to a controller method. Throws:
+Applies an IP allowlist check and `pg_sig` signature verification guard to a controller method. Throws:
 
 - `ForbiddenException` — request IP not in `allowedIps`
 - `UnauthorizedException` — missing/invalid `pg_sig`
@@ -230,6 +259,20 @@ async handleResult(@Body() body: Record<string, string>) { ... }
 If `allowedIps` is empty or not set, the IP check is skipped — but the signature check is **always** performed.
 
 > The decorator covers the `result` script (configurable via `resultScriptName`). For `check_url` callbacks, call `paybox.verifyCheckWebhook(body)` manually.
+
+## Security notes
+
+- **Constant-time signatures.** Webhook `pg_sig` is compared with
+  `crypto.timingSafeEqual`, so signature verification doesn't leak timing
+  information about the expected value.
+- **Log redaction.** Raw provider XML is only logged at `debug`, and card/PII
+  fields (`pg_card_pan`, `pg_card_hash`, `pg_user_phone`, `pg_user_contact_email`)
+  are masked before logging.
+- **IP allowlist & proxies.** When behind a load balancer the guard reads the
+  client IP from `req.ip` (which honors Express `trust proxy`), falling back to
+  `x-forwarded-for`. That header is client-spoofable unless terminated at a
+  trusted proxy — set `trust proxy` and overwrite `x-forwarded-for` at your edge
+  before relying on `allowedIps` as a security boundary.
 
 ## Types
 
@@ -272,21 +315,30 @@ PAYBOX_CALLBACK_IPS=13.60.106.42
 
 ## Amount handling
 
-All amounts are in **minor units** (tiyns for KZT: 1 KZT = 100 tiyns). The library automatically converts to major units when calling the provider API.
+All amounts are in **minor units** (tiyns for KZT: 1 KZT = 100 tiyns). The library
+automatically converts to major units when calling the provider API.
 
 ```typescript
 // 1500 KZT → pass 150000
 await paybox.initPayment({ amount: 150000, currency: 'KZT', ... })
 ```
 
+## Contributing
+
+Contributions of any size are welcome — bug reports, docs, or code. See
+[CONTRIBUTING.md](./CONTRIBUTING.md) for how to set up, run the checks, and open a
+pull request. Issues that are a good place to start are labeled
+[`good first issue`](https://github.com/cclxxi/nestjs-paybox/labels/good%20first%20issue).
+
 ## License
 
 GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later).
 See [`LICENSE`](./LICENSE) and [`COPYING`](./COPYING) for the full text.
 
-Versions `0.1.3` and earlier were released under the MIT license. The
-`0.1.6` release was briefly published under GPL-3.0. From `0.1.7` onward
-the package is licensed under LGPL-3.0-or-later — application code that
-merely imports this library is **not** required to be open-sourced;
-modifications to the library itself must remain under a compatible
-license.
+Copyright © 2026 Ilia Proshin.
+
+Versions `0.1.3` and earlier were released under the MIT license. The `0.1.6`
+release was briefly published under GPL-3.0. From `0.1.7` onward the package is
+licensed under LGPL-3.0-or-later — application code that merely imports this
+library is **not** required to be open-sourced; modifications to the library
+itself must remain under a compatible license.
